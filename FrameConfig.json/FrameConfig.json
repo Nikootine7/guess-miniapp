@@ -1,0 +1,9 @@
+{
+  "name": "Guess the Song",
+  "version": "1.0.0",
+  "description": "Mini app for guessing songs and earning ETH prizes.",
+  "frame": {
+    "post_url": "https://YOURDOMAIN.com/api/frame",
+    "aspect_ratio": "1.91:1"
+  }
+}
