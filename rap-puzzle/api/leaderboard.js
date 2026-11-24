@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.rpc("weekly_leaderboard");
+    const { data, error } = await supabase.rpc("rap_weekly_leaderboard");
     if (error) throw error;
     return res.status(200).json({ leaderboard: data || [] });
   } catch (error) {

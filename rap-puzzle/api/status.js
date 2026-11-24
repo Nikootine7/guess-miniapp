@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: prompt, error: promptError } = await supabase
-      .from("daily_prompts")
+      .from("rap_daily_prompts")
       .select("id")
       .eq("active_date", utcDateKey())
       .maybeSingle();
@@ -23,9 +23,9 @@ export default async function handler(req, res) {
     }
 
     const [stateResult, submissionResult, budgetResult] = await Promise.all([
-      supabase.from("player_day_state").select("attempts_used,is_complete,code_score").eq("prompt_id", prompt.id).eq("fid", fid).maybeSingle(),
-      supabase.from("user_submissions").select("id,submission_text,is_wildcard,score_code,score_community").eq("prompt_id", prompt.id).eq("fid", fid).maybeSingle(),
-      supabase.from("voting_budgets").select("points_used").eq("prompt_id", prompt.id).eq("voter_fid", fid).maybeSingle(),
+      supabase.from("rap_player_day_state").select("attempts_used,is_complete,code_score").eq("prompt_id", prompt.id).eq("fid", fid).maybeSingle(),
+      supabase.from("rap_submissions").select("id,submission_text,is_wildcard,score_code,score_community").eq("prompt_id", prompt.id).eq("fid", fid).maybeSingle(),
+      supabase.from("rap_voting_budgets").select("points_used").eq("prompt_id", prompt.id).eq("voter_fid", fid).maybeSingle(),
     ]);
     if (stateResult.error) throw stateResult.error;
     if (submissionResult.error) throw submissionResult.error;

@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: prompt, error: promptError } = await supabase
-      .from("daily_prompts")
+      .from("rap_daily_prompts")
       .select("id")
       .eq("active_date", utcDateKey())
       .maybeSingle();
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     if (!prompt) return res.status(404).json({ code: "no_prompt", message: "چالش امروز هنوز منتشر نشده." });
 
     const { data: state, error: stateError } = await supabase
-      .from("player_day_state")
+      .from("rap_player_day_state")
       .select("is_complete")
       .eq("prompt_id", prompt.id)
       .eq("fid", fid)
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await supabase
-      .from("user_submissions")
+      .from("rap_submissions")
       .select("id, fid, submission_text, is_wildcard, score_code, score_community")
       .eq("prompt_id", prompt.id)
       .neq("fid", fid)

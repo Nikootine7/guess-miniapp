@@ -1,6 +1,7 @@
+-- RapPuzzle tables are isolated from the existing rap-meme schema.
 create extension if not exists pgcrypto;
 
-create table if not exists public.daily_prompts (
+create table if not exists public.rap_daily_prompts (
   id uuid primary key default gen_random_uuid(),
   active_date date not null unique,
   opening_line text not null,
@@ -11,8 +12,8 @@ create table if not exists public.daily_prompts (
   constraint daily_prompt_rhyme_word_length check (char_length(target_rhyme_word) between 1 and 100)
 );
 
-create table if not exists public.player_day_state (
-  prompt_id uuid not null references public.daily_prompts(id) on delete cascade,
+create table if not exists public.rap_player_day_state (
+  prompt_id uuid not null references public.rap_daily_prompts(id) on delete cascade,
   fid bigint not null check (fid > 0),
   attempts_used smallint not null default 0 check (attempts_used between 0 and 3),
   is_complete boolean not null default false,
@@ -21,9 +22,9 @@ create table if not exists public.player_day_state (
   primary key (prompt_id, fid)
 );
 
-create table if not exists public.user_attempts (
+create table if not exists public.rap_attempts (
   id uuid primary key default gen_random_uuid(),
-  prompt_id uuid not null references public.daily_prompts(id) on delete cascade,
+  prompt_id uuid not null references public.rap_daily_prompts(id) on delete cascade,
   fid bigint not null check (fid > 0),
   attempt_number smallint not null check (attempt_number between 1 and 3),
   verse text not null check (char_length(btrim(verse)) between 1 and 280),
@@ -34,9 +35,9 @@ create table if not exists public.user_attempts (
   unique (prompt_id, fid, attempt_number)
 );
 
-create table if not exists public.user_submissions (
+create table if not exists public.rap_submissions (
   id uuid primary key default gen_random_uuid(),
-  prompt_id uuid not null references public.daily_prompts(id) on delete cascade,
+  prompt_id uuid not null references public.rap_daily_prompts(id) on delete cascade,
   fid bigint not null check (fid > 0),
   submission_text text not null check (char_length(btrim(submission_text)) between 1 and 280),
   attempts_used smallint not null check (attempts_used between 1 and 3),
@@ -47,47 +48,47 @@ create table if not exists public.user_submissions (
   unique (prompt_id, fid)
 );
 
-create table if not exists public.voting_budgets (
-  prompt_id uuid not null references public.daily_prompts(id) on delete cascade,
+create table if not exists public.rap_voting_budgets (
+  prompt_id uuid not null references public.rap_daily_prompts(id) on delete cascade,
   voter_fid bigint not null check (voter_fid > 0),
   points_used smallint not null default 0 check (points_used between 0 and 100),
   updated_at timestamptz not null default now(),
   primary key (prompt_id, voter_fid)
 );
 
-create table if not exists public.social_votes (
+create table if not exists public.rap_votes (
   id uuid primary key default gen_random_uuid(),
-  prompt_id uuid not null references public.daily_prompts(id) on delete cascade,
+  prompt_id uuid not null references public.rap_daily_prompts(id) on delete cascade,
   voter_fid bigint not null check (voter_fid > 0),
-  submission_id uuid not null references public.user_submissions(id) on delete cascade,
+  submission_id uuid not null references public.rap_submissions(id) on delete cascade,
   points_allocated smallint not null check (points_allocated > 0),
   created_at timestamptz not null default now(),
   unique (prompt_id, voter_fid, submission_id)
 );
 
-create index if not exists user_submissions_prompt_score_idx
-  on public.user_submissions (prompt_id, score_community asc, created_at desc);
-create index if not exists user_submissions_fid_idx
-  on public.user_submissions (fid);
-create index if not exists daily_prompts_active_date_idx
-  on public.daily_prompts (active_date desc);
+create index if not exists rap_submissions_prompt_score_idx
+  on public.rap_submissions (prompt_id, score_community asc, created_at desc);
+create index if not exists rap_submissions_fid_idx
+  on public.rap_submissions (fid);
+create index if not exists rap_daily_prompts_active_date_idx
+  on public.rap_daily_prompts (active_date desc);
 
-alter table public.daily_prompts enable row level security;
-alter table public.player_day_state enable row level security;
-alter table public.user_attempts enable row level security;
-alter table public.user_submissions enable row level security;
-alter table public.voting_budgets enable row level security;
-alter table public.social_votes enable row level security;
+alter table public.rap_daily_prompts enable row level security;
+alter table public.rap_player_day_state enable row level security;
+alter table public.rap_attempts enable row level security;
+alter table public.rap_submissions enable row level security;
+alter table public.rap_voting_budgets enable row level security;
+alter table public.rap_votes enable row level security;
 
-revoke all on public.daily_prompts, public.player_day_state, public.user_attempts,
-  public.user_submissions, public.voting_budgets, public.social_votes
-  from anon, authenticated;
+revoke all on public.rap_daily_prompts, public.rap_player_day_state, public.rap_attempts,
+  public.rap_submissions, public.rap_voting_budgets, public.rap_votes
+  from public, anon, authenticated;
 
-grant all on public.daily_prompts, public.player_day_state, public.user_attempts,
-  public.user_submissions, public.voting_budgets, public.social_votes
+grant all on public.rap_daily_prompts, public.rap_player_day_state, public.rap_attempts,
+  public.rap_submissions, public.rap_voting_budgets, public.rap_votes
   to service_role;
 
-create or replace function public.submit_rap_attempt(
+create or replace function public.rap_submit_attempt(
   p_fid bigint,
   p_verse text,
   p_end_word text
@@ -95,10 +96,10 @@ create or replace function public.submit_rap_attempt(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
-  v_prompt public.daily_prompts%rowtype;
+  v_prompt public.rap_daily_prompts%rowtype;
   v_attempts smallint;
   v_is_complete boolean;
   v_attempt_number smallint;
@@ -118,7 +119,7 @@ begin
 
   select *
     into v_prompt
-    from public.daily_prompts
+    from public.rap_daily_prompts
    where active_date = (now() at time zone 'UTC')::date
    limit 1;
 
@@ -126,13 +127,13 @@ begin
     raise exception 'no_active_prompt';
   end if;
 
-  insert into public.player_day_state (prompt_id, fid)
+  insert into public.rap_player_day_state (prompt_id, fid)
   values (v_prompt.id, p_fid)
   on conflict (prompt_id, fid) do nothing;
 
   select attempts_used, is_complete
     into v_attempts, v_is_complete
-    from public.player_day_state
+    from public.rap_player_day_state
    where prompt_id = v_prompt.id and fid = p_fid
    for update;
 
@@ -155,13 +156,13 @@ begin
   end;
   v_completed := v_correct or v_attempt_number = 3;
 
-  insert into public.user_attempts (
+  insert into public.rap_attempts (
     prompt_id, fid, attempt_number, verse, end_word, is_correct, code_score
   ) values (
     v_prompt.id, p_fid, v_attempt_number, btrim(p_verse), btrim(p_end_word), v_correct, v_score
   );
 
-  update public.player_day_state
+  update public.rap_player_day_state
      set attempts_used = v_attempt_number,
          is_complete = v_completed,
          code_score = case when v_completed then v_score else 0 end,
@@ -169,7 +170,7 @@ begin
    where prompt_id = v_prompt.id and fid = p_fid;
 
   if v_completed then
-    insert into public.user_submissions (
+    insert into public.rap_submissions (
       prompt_id, fid, submission_text, attempts_used, score_code, is_wildcard
     ) values (
       v_prompt.id, p_fid, btrim(p_verse), v_attempt_number, v_score, not v_correct
@@ -188,7 +189,7 @@ begin
 end;
 $$;
 
-create or replace function public.allocate_social_points(
+create or replace function public.rap_allocate_social_points(
   p_fid bigint,
   p_submission_id uuid,
   p_points smallint
@@ -196,7 +197,7 @@ create or replace function public.allocate_social_points(
 returns smallint
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
   v_prompt_id uuid;
@@ -210,8 +211,8 @@ begin
 
   select s.prompt_id, s.fid, p.active_date
     into v_prompt_id, v_target_fid, v_active_date
-    from public.user_submissions s
-    join public.daily_prompts p on p.id = s.prompt_id
+    from public.rap_submissions s
+    join public.rap_daily_prompts p on p.id = s.prompt_id
    where s.id = p_submission_id;
 
   if not found or v_active_date <> (now() at time zone 'UTC')::date then
@@ -221,13 +222,13 @@ begin
     raise exception 'self_vote';
   end if;
 
-  insert into public.voting_budgets (prompt_id, voter_fid)
+  insert into public.rap_voting_budgets (prompt_id, voter_fid)
   values (v_prompt_id, p_fid)
   on conflict (prompt_id, voter_fid) do nothing;
 
   select points_used
     into v_points_used
-    from public.voting_budgets
+    from public.rap_voting_budgets
    where prompt_id = v_prompt_id and voter_fid = p_fid
    for update;
 
@@ -235,19 +236,19 @@ begin
     raise exception 'vote_budget_exceeded';
   end if;
 
-  insert into public.social_votes (prompt_id, voter_fid, submission_id, points_allocated)
+  insert into public.rap_votes (prompt_id, voter_fid, submission_id, points_allocated)
   values (v_prompt_id, p_fid, p_submission_id, p_points)
   on conflict (prompt_id, voter_fid, submission_id)
-  do update set points_allocated = public.social_votes.points_allocated + excluded.points_allocated,
+  do update set points_allocated = public.rap_votes.points_allocated + excluded.points_allocated,
                 created_at = now();
 
-  update public.voting_budgets
+  update public.rap_voting_budgets
      set points_used = points_used + p_points,
          updated_at = now()
    where prompt_id = v_prompt_id and voter_fid = p_fid
   returning points_used into v_points_used;
 
-  update public.user_submissions
+  update public.rap_submissions
      set score_community = score_community + p_points
    where id = p_submission_id;
 
@@ -255,7 +256,7 @@ begin
 end;
 $$;
 
-create or replace function public.weekly_leaderboard()
+create or replace function public.rap_weekly_leaderboard()
 returns table (
   fid bigint,
   code_score bigint,
@@ -264,14 +265,14 @@ returns table (
 )
 language sql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
   select s.fid,
          sum(s.score_code)::bigint as code_score,
          sum(s.score_community)::bigint as community_score,
          sum(s.score_code + s.score_community)::bigint as total_score
-    from public.user_submissions s
-    join public.daily_prompts p on p.id = s.prompt_id
+    from public.rap_submissions s
+    join public.rap_daily_prompts p on p.id = s.prompt_id
    where p.active_date >= date_trunc('week', now() at time zone 'UTC')::date
      and p.active_date <= (now() at time zone 'UTC')::date
    group by s.fid
@@ -279,11 +280,11 @@ as $$
    limit 50;
 $$;
 
-revoke all on function public.submit_rap_attempt(bigint, text, text) from public, anon, authenticated;
-revoke all on function public.allocate_social_points(bigint, uuid, smallint) from public, anon, authenticated;
-revoke all on function public.weekly_leaderboard() from public, anon, authenticated;
+revoke all on function public.rap_submit_attempt(bigint, text, text) from public, anon, authenticated;
+revoke all on function public.rap_allocate_social_points(bigint, uuid, smallint) from public, anon, authenticated;
+revoke all on function public.rap_weekly_leaderboard() from public, anon, authenticated;
 
-grant execute on function public.submit_rap_attempt(bigint, text, text) to service_role;
-grant execute on function public.allocate_social_points(bigint, uuid, smallint) to service_role;
-grant execute on function public.weekly_leaderboard() to service_role;
+grant execute on function public.rap_submit_attempt(bigint, text, text) to service_role;
+grant execute on function public.rap_allocate_social_points(bigint, uuid, smallint) to service_role;
+grant execute on function public.rap_weekly_leaderboard() to service_role;
 

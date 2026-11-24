@@ -41,5 +41,5 @@ The initial release has no pay-to-submit step. NFT badges, the marketplace, merc
 
 ## Database migration
 
-The SQL file in supabase/migrations defines prompts, attempts, submissions, daily voting budgets, and weekly leaderboard logic. Review and apply it only after the paused Supabase project is restored. All user writes must go through authenticated server endpoints; browser clients do not receive the service-role key.
+The SQL file in supabase/migrations defines the RapPuzzle data and server-side scoring functions using the `rap_*` namespace. This keeps the restored project’s existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. The migration has not been applied. Review it before deployment. All user writes must go through authenticated server endpoints; browser clients do not receive the service-role key.
 

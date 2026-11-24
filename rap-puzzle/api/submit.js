@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.rpc("submit_rap_attempt", {
+    const { data, error } = await supabase.rpc("rap_submit_attempt", {
       p_fid: fid,
       p_verse: verse,
       p_end_word: lastWordOf(verse),
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       if (text.includes("invalid_verse")) {
         return res.status(400).json({ code: "invalid_verse", message: "مصرع قابل قبول نیست." });
       }
-      console.error("submit_rap_attempt failed:", text);
+      console.error("rap_submit_attempt failed:", text);
       return res.status(503).json({ code: "submit_failed", message: "تلاش ثبت نشد؛ کمی بعد دوباره امتحان کن." });
     }
 

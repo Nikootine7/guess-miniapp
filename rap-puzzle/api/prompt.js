@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
-      .from("daily_prompts")
+      .from("rap_daily_prompts")
       .select("id, active_date, opening_line, target_rhyme_word")
       .eq("active_date", utcDateKey())
       .maybeSingle();

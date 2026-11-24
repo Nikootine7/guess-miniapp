@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.rpc("allocate_social_points", {
+    const { data, error } = await supabase.rpc("rap_allocate_social_points", {
       p_fid: fid,
       p_submission_id: submissionId,
       p_points: points,
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       if (text.includes("invalid_submission")) {
         return res.status(404).json({ code: "invalid_submission", message: "این نسخه برای رأی‌گیری پیدا نشد." });
       }
-      console.error("allocate_social_points failed:", text);
+      console.error("rap_allocate_social_points failed:", text);
       return res.status(503).json({ code: "vote_failed", message: "رأی ثبت نشد؛ کمی بعد دوباره امتحان کن." });
     }
 
