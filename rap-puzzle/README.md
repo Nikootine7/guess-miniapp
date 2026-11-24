@@ -41,5 +41,5 @@ The initial release has no pay-to-submit step. NFT badges, the marketplace, merc
 
 ## Database migration
 
-The SQL file in supabase/migrations defines the RapPuzzle data and server-side scoring functions using the `rap_*` namespace. This keeps the restored project’s existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. The migration has not been applied. Review it before deployment. All user writes must go through authenticated server endpoints; browser clients do not receive the service-role key.
+The SQL file in supabase/migrations defines the RapPuzzle data and server-side scoring functions using the `rap_*` namespace. This keeps the restored project’s existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. The migration was applied and recorded in Supabase on 2026-11-24. It creates only `rap_*` tables and functions, leaving the existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. No daily prompt has been seeded yet, and the app is not deployed or live-configured. Review it before deployment. All user writes must go through authenticated server endpoints; browser clients do not receive the service-role key.
 
