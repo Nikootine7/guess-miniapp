@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { sdk } from "@farcaster/miniapp-sdk";
+import { lastWordOf, normalizePersianToken } from "../shared/normalize-persian.js";
 
 const DEMO_PROMPT = {
   id: "demo-2026-11-24",
@@ -41,11 +42,6 @@ function readGameState(key) {
   }
 }
 
-function normalizeEndWord(text) {
-  const words = text.normalize("NFKC").trim().split(/\s+/u);
-  return (words.at(-1) || "").replace(/[\p{P}\p{S}]+$/u, "").toLocaleLowerCase("fa");
-}
-
 function getPointsForAttempt(attempt) {
   return [50, 30, 10][attempt - 1] || 0;
 }
@@ -53,17 +49,27 @@ function getPointsForAttempt(attempt) {
 export default function App() {
   const [dayKey, setDayKey] = useState(initialDayKey);
   const [host, setHost] = useState({ checked: false, isMiniApp: false, fid: null, username: null });
-  const [prompt, setPrompt] = useState(DEMO_PROMPT);
+  const [prompt, setPrompt] = useState(LIVE_REQUESTED ? null : DEMO_PROMPT);
+  const [livePhase, setLivePhase] = useState(LIVE_REQUESTED ? "checking" : "preview");
+  const [promptError, setPromptError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
   const [screen, setScreen] = useState("play");
-  const [game, setGame] = useState(() => readGameState(storageKeyForDate(initialDayKey)));
+  const [game, setGame] = useState(() => LIVE_REQUESTED ? emptyGameState() : readGameState(storageKeyForDate(initialDayKey)));
   const [livePointsUsed, setLivePointsUsed] = useState(0);
   const [verse, setVerse] = useState("");
   const [notice, setNotice] = useState("");
   const [feed, setFeed] = useState(DEMO_SUBMISSIONS);
   const [leaderboard, setLeaderboard] = useState(DEMO_LEADERBOARD);
+  const [weeklyAwards, setWeeklyAwards] = useState([]);
+  const [adminPrompt, setAdminPrompt] = useState({
+    active_date: initialDayKey,
+    opening_line: "",
+    target_rhyme_word: "",
+    accepted_end_words: "",
+  });
   const [loading, setLoading] = useState(false);
 
-  const liveMode = LIVE_REQUESTED && host.isMiniApp;
+  const liveMode = LIVE_REQUESTED && host.checked && host.isMiniApp;
   const remainingPoints = useMemo(
     () => liveMode
       ? Math.max(0, 100 - livePointsUsed)
@@ -104,9 +110,17 @@ export default function App() {
           }
         } else if (mounted) {
           setHost({ checked: true, isMiniApp: false, fid: null, username: null });
+          setPrompt(DEMO_PROMPT);
+          setGame(readGameState(storageKeyForDate(dayKey)));
+          setLivePhase("preview");
         }
       } catch {
-        if (mounted) setHost({ checked: true, isMiniApp: false, fid: null, username: null });
+        if (mounted) {
+          setHost({ checked: true, isMiniApp: false, fid: null, username: null });
+          setPrompt(DEMO_PROMPT);
+          setGame(readGameState(storageKeyForDate(dayKey)));
+          setLivePhase("preview");
+        }
       }
     }
 
@@ -117,36 +131,102 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(storageKeyForDate(dayKey), JSON.stringify(game));
-  }, [dayKey, game]);
+    if (liveMode || (LIVE_REQUESTED && !host.checked)) return;
+    try {
+      window.localStorage.setItem(storageKeyForDate(dayKey), JSON.stringify(game));
+    } catch {
+      // The preview still works when browser storage is unavailable.
+    }
+  }, [dayKey, game, host.checked, liveMode]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       const currentDay = new Date().toISOString().slice(0, 10);
       if (currentDay !== dayKey) {
         setDayKey(currentDay);
-        setGame(readGameState(storageKeyForDate(currentDay)));
+        setGame(liveMode ? emptyGameState() : readGameState(storageKeyForDate(currentDay)));
         setLivePointsUsed(0);
-        setPrompt(DEMO_PROMPT);
+        setPrompt(liveMode ? null : DEMO_PROMPT);
+        setPromptError("");
+        setLivePhase(liveMode ? "loading" : "preview");
+        setFeed(liveMode ? [] : DEMO_SUBMISSIONS);
+        setLeaderboard(liveMode ? [] : DEMO_LEADERBOARD);
+        setWeeklyAwards([]);
         setScreen("play");
         setNotice("");
       }
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [dayKey]);
+  }, [dayKey, liveMode]);
 
   useEffect(() => {
     if (!liveMode) return;
     let mounted = true;
 
     async function loadLiveData() {
+      setLivePhase("loading");
+      setPrompt(null);
+      setPromptError("");
+      setGame(emptyGameState());
+      setLivePointsUsed(0);
+      setFeed([]);
+      setLeaderboard([]);
+      setWeeklyAwards([]);
       try {
-        const response = await sdk.quickAuth.fetch("/api/prompt");
-        if (!response.ok) throw new Error("چالش امروز در دسترس نیست.");
-        const data = await response.json();
-        if (mounted) setPrompt(data.prompt);
+        const [promptResponse, statusResponse, identityResponse] = await Promise.all([
+          sdk.quickAuth.fetch("/api/prompt"),
+          sdk.quickAuth.fetch("/api/status"),
+          sdk.quickAuth.fetch("/api/auth/me"),
+        ]);
+        const [promptData, statusData, identityData] = await Promise.all([
+          promptResponse.json().catch(() => ({})),
+          statusResponse.json().catch(() => ({})),
+          identityResponse.json().catch(() => ({})),
+        ]);
+        if (!mounted) return;
+
+        if (promptResponse.status === 404 || statusData.prompt_available === false) {
+          setPrompt(null);
+          setGame(emptyGameState());
+          setLivePhase("no-prompt");
+          setPromptError(promptData.message || "چالش امروز هنوز منتشر نشده.");
+          return;
+        }
+        if (!promptResponse.ok) throw new Error(promptData.message || "چالش امروز بارگذاری نشد.");
+        if (!statusResponse.ok) throw new Error(statusData.message || "وضعیت امروز بارگذاری نشد.");
+        if (!promptData.prompt) throw new Error("پاسخ چالش امروز کامل نیست.");
+
+        setPrompt(promptData.prompt);
+        setLivePointsUsed(Number(statusData.points_used || 0));
+        setGame({
+          attempts: Number(statusData.attempts_used || 0),
+          completed: Boolean(statusData.is_complete),
+          scoreCode: Number(statusData.code_score || 0),
+          submission: statusData.submission ? {
+            id: statusData.submission.id,
+            fid: host.fid || Number(identityData.fid) || 0,
+            submission_text: statusData.submission.submission_text,
+            is_wildcard: statusData.submission.is_wildcard,
+            score_code: statusData.submission.score_code,
+            score_community: statusData.submission.score_community,
+          } : null,
+          votes: {},
+        });
+        if (Number.isSafeInteger(Number(identityData.fid)) && Number(identityData.fid) > 0) {
+          setHost((current) => ({
+            ...current,
+            fid: Number(identityData.fid),
+            isAdmin: Boolean(identityData.is_admin),
+          }));
+        } else if (identityResponse.ok) {
+          setHost((current) => ({ ...current, isAdmin: Boolean(identityData.is_admin) }));
+        }
+        setLivePhase("ready");
       } catch (error) {
-        if (mounted) setNotice(error.message || "اتصال به چالش برقرار نشد.");
+        if (mounted) {
+          setLivePhase("error");
+          setPromptError(error.message || "اتصال به چالش برقرار نشد.");
+        }
       }
     }
 
@@ -154,41 +234,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [dayKey, liveMode]);
-
-  useEffect(() => {
-    if (!liveMode) return;
-    let mounted = true;
-
-    async function loadPlayerStatus() {
-      try {
-        const response = await sdk.quickAuth.fetch("/api/status");
-        if (!response.ok) throw new Error("وضعیت امروز بارگذاری نشد.");
-        const data = await response.json();
-        if (!mounted) return;
-        setLivePointsUsed(Number(data.points_used || 0));
-        setGame((current) => ({
-          ...current,
-          attempts: Number(data.attempts_used || 0),
-          completed: Boolean(data.is_complete),
-          scoreCode: Number(data.code_score || 0),
-          submission: data.submission ? {
-            id: data.submission.id,
-            fid: host.fid || 0,
-            submission_text: data.submission.submission_text,
-            is_wildcard: data.submission.is_wildcard,
-            score_code: data.submission.score_code,
-            score_community: data.submission.score_community,
-          } : null,
-        }));
-      } catch (error) {
-        if (mounted) setNotice(error.message || "وضعیت امروز بارگذاری نشد.");
-      }
-    }
-
-    loadPlayerStatus();
-    return () => { mounted = false; };
-  }, [dayKey, host.fid, liveMode]);
+  }, [dayKey, liveMode, retryCount]);
 
   async function refreshFeed() {
     if (!liveMode || !game.completed) {
@@ -204,16 +250,19 @@ export default function App() {
   async function refreshLeaderboard() {
     if (!liveMode) {
       setLeaderboard(DEMO_LEADERBOARD);
+      setWeeklyAwards([]);
       return;
     }
     const response = await fetch("/api/leaderboard");
     if (!response.ok) throw new Error("جدول هفتگی بارگذاری نشد.");
     const data = await response.json();
     setLeaderboard(data.leaderboard || []);
+    setWeeklyAwards(data.awards || []);
   }
 
   async function submitVerse(event) {
     event.preventDefault();
+    if (!prompt || (liveMode && livePhase !== "ready")) return;
     const cleanVerse = verse.trim();
     if (!cleanVerse) {
       setNotice("اول مصرعت رو بنویس.");
@@ -250,10 +299,9 @@ export default function App() {
             : "قافیه هنوز ننشسته؛ یک تلاش دیگه داری.");
       } else {
         const attempt = game.attempts + 1;
-        const endWord = normalizeEndWord(cleanVerse);
-        const correct = prompt.accepted_end_words.some(
-          (word) => word.toLocaleLowerCase("fa") === endWord
-        );
+        const endWord = lastWordOf(cleanVerse);
+        const acceptedWords = Array.isArray(prompt.accepted_end_words) ? prompt.accepted_end_words : [];
+        const correct = acceptedWords.some((word) => normalizePersianToken(word) === endWord);
         const completed = correct || attempt === 3;
         const scoreCode = correct ? getPointsForAttempt(attempt) : 0;
         setGame((current) => ({
@@ -347,8 +395,44 @@ export default function App() {
     }
   }
 
+  async function publishPrompt(event) {
+    event.preventDefault();
+    if (!liveMode || !host.isAdmin) return;
+    const acceptedEndWords = adminPrompt.accepted_end_words
+      .split(/[،,\n]/u)
+      .map((word) => word.trim())
+      .filter(Boolean);
+
+    setLoading(true);
+    setNotice("");
+    try {
+      const response = await sdk.quickAuth.fetch("/api/admin/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          active_date: adminPrompt.active_date,
+          opening_line: adminPrompt.opening_line,
+          target_rhyme_word: adminPrompt.target_rhyme_word,
+          accepted_end_words: acceptedEndWords,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "ذخیرهٔ چالش انجام نشد.");
+      setNotice("چالش " + data.prompt.active_date + " منتشر شد.");
+      if (data.prompt.active_date === dayKey) {
+        setRetryCount((count) => count + 1);
+        setScreen("play");
+      }
+    } catch (error) {
+      setNotice(error.message || "ذخیرهٔ چالش انجام نشد.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const attemptsLeft = Math.max(0, 3 - game.attempts);
   const displayName = host.username || (host.fid ? "FID " + host.fid : "مهمان");
+  const canSubmit = !liveMode || livePhase === "ready";
 
   return (
     <div className="app-shell">
@@ -381,24 +465,42 @@ export default function App() {
           <span className="banner-icon">✦</span>
           <span>
             {liveMode
-              ? "اتصال زنده · امتیازها با هویت Farcaster ثبت می‌شن."
+              ? livePhase === "ready"
+                ? "اتصال زنده · امتیازها با هویت Farcaster ثبت می‌شن."
+                : livePhase === "no-prompt"
+                  ? "چالش امروز هنوز منتشر نشده."
+                  : livePhase === "error"
+                    ? promptError || "اتصال زنده برقرار نشد."
+                    : "در حال اتصال به حساب و چالش امروز…"
               : LIVE_REQUESTED && host.checked && !host.isMiniApp
                 ? "برای ثبت واقعی، برنامه رو داخل Farcaster باز کن."
-                : "پیش‌نمایش محلی · امتیازها فقط روی همین مرورگر ذخیره می‌شن."}
+                : LIVE_REQUESTED && !host.checked
+                  ? "در حال بررسی محیط Farcaster…"
+                  : "پیش‌نمایش محلی · امتیازها فقط روی همین مرورگر ذخیره می‌شن."}
           </span>
         </div>
 
         <nav className="tabs" aria-label="بخش‌های بازی">
           <button className={screen === "play" ? "tab active" : "tab"} onClick={() => setScreen("play")}>چالش امروز</button>
           <button className={screen === "feed" ? "tab active" : "tab"} onClick={openFeed} disabled={!game.completed || loading}>فید رأی‌گیری {game.completed ? "" : "🔒"}</button>
-          <button className={screen === "leaderboard" ? "tab active" : "tab"} onClick={openLeaderboard} disabled={loading}>جدول هفتگی</button>
+          <button className={screen === "leaderboard" ? "tab active" : "tab"} onClick={openLeaderboard} disabled={loading || (LIVE_REQUESTED && !host.checked)}>جدول هفتگی</button>
+          {liveMode && host.isAdmin && <button className={screen === "admin" ? "tab active" : "tab"} onClick={() => setScreen("admin")} disabled={loading}>مدیریت چالش</button>}
         </nav>
 
-        {screen === "play" && (
+        {screen === "play" && !prompt && (
+          <section className="challenge-card panel">
+            <p className="eyebrow">چالش روزانه</p>
+            <h2>{livePhase === "no-prompt" ? "برای امروز چالشی منتشر نشده." : livePhase === "error" ? "اتصال به چالش برقرار نشد." : "در حال آماده‌سازی چالش…"}</h2>
+            {promptError && <p className="section-copy">{promptError}</p>}
+            {(livePhase === "error" || livePhase === "no-prompt") && <button className="text-button" onClick={() => setRetryCount((count) => count + 1)}>{livePhase === "no-prompt" ? "بررسی دوباره" : "تلاش دوباره"} ←</button>}
+          </section>
+        )}
+
+        {screen === "play" && prompt && (
           <section className="challenge-card panel">
             <div className="card-topline">
               <span className="challenge-label"><span className="live-pulse" /> چالش امروز</span>
-              <span className="date-label">{dayKey}</span>
+              <span className="date-label">{prompt.active_date || dayKey}</span>
             </div>
             <div className="opening-line">
               <span className="quote-mark">“</span>
@@ -421,12 +523,12 @@ export default function App() {
                   value={verse}
                   onChange={(event) => setVerse(event.target.value)}
                   placeholder="ادامه‌ش رو بنویس…"
-                  disabled={loading || game.attempts >= 3}
+                  disabled={loading || !canSubmit || game.attempts >= 3}
                 />
                 <div className="form-footer">
                   <span>{verse.length} / ۲۸۰</span>
-                  <button className="primary-button" type="submit" disabled={loading || game.attempts >= 3}>
-                    {loading ? "در حال بررسی…" : game.attempts === 0 ? "قافیه رو چک کن" : "تلاش دوباره"}
+                  <button className="primary-button" type="submit" disabled={loading || !canSubmit || game.attempts >= 3}>
+                    {loading || !canSubmit ? "در حال بررسی…" : game.attempts === 0 ? "قافیه رو چک کن" : "تلاش دوباره"}
                     <span aria-hidden="true">↗</span>
                   </button>
                 </div>
@@ -483,6 +585,7 @@ export default function App() {
                   <p className="submission-verse">{game.submission.submission_text}</p>
                 </article>
               )}
+              {feed.length === 0 && <p className="section-copy">هنوز نسخه‌ای برای رأی‌گیری منتشر نشده.</p>}
             </div>
           </section>
         )}
@@ -502,8 +605,40 @@ export default function App() {
                   <div className="leader-score"><strong>{person.total_score}</strong><small>امتیاز کل</small></div>
                 </div>
               ))}
+              {leaderboard.length === 0 && <p className="section-copy">هنوز امتیازی برای این هفته ثبت نشده.</p>}
             </div>
-            <div className="badge-note"><span>✦</span><p>سه نفر اول هفته، نشان دائمی می‌گیرن. NFT و بازارچه توی مرحلهٔ بعدی اضافه می‌شن.</p></div>
+            {weeklyAwards.length > 0 && (
+              <div className="leaderboard-list">
+                <p className="eyebrow">نشان‌های دائمی هفته‌های گذشته</p>
+                {weeklyAwards.map((award) => (
+                  <div className="leader-row" key={award.week_start + "-" + award.fid}>
+                    <span className={"rank rank-" + award.badge_rank}>{String(award.badge_rank).padStart(2, "0")}</span>
+                    <span className="avatar">✦</span>
+                    <div className="leader-person"><strong>FID {award.fid}</strong><small>{award.week_start}</small></div>
+                    <div className="leader-score"><strong>{award.total_score}</strong><small>امتیاز هفته</small></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="badge-note"><span>✦</span><p>سه نفر اول هر هفته، نشان دائمی می‌گیرن. NFT و بازارچه در مرحلهٔ بعدی اضافه می‌شن.</p></div>
+          </section>
+        )}
+
+        {screen === "admin" && liveMode && host.isAdmin && (
+          <section className="panel challenge-card">
+            <div className="section-heading"><div><p className="eyebrow">ADMIN</p><h2>انتشار چالش</h2></div></div>
+            <p className="section-copy">تاریخ بر اساس UTC است. واژهٔ هدف هم به فهرست قافیه‌های پذیرفته‌شده اضافه می‌شود.</p>
+            <form className="admin-form" onSubmit={publishPrompt}>
+              <label htmlFor="prompt-date">تاریخ انتشار</label>
+              <input id="prompt-date" type="date" required value={adminPrompt.active_date} onChange={(event) => setAdminPrompt((value) => ({ ...value, active_date: event.target.value }))} />
+              <label htmlFor="opening-line">خط شروع</label>
+              <textarea id="opening-line" required maxLength={500} value={adminPrompt.opening_line} onChange={(event) => setAdminPrompt((value) => ({ ...value, opening_line: event.target.value }))} />
+              <label htmlFor="target-word">قافیهٔ هدف</label>
+              <input id="target-word" required maxLength={100} value={adminPrompt.target_rhyme_word} onChange={(event) => setAdminPrompt((value) => ({ ...value, target_rhyme_word: event.target.value }))} />
+              <label htmlFor="accepted-words">واژه‌های قافیهٔ مجاز</label>
+              <textarea id="accepted-words" required placeholder="با ویرگول یا خط جدید جدا کن" value={adminPrompt.accepted_end_words} onChange={(event) => setAdminPrompt((value) => ({ ...value, accepted_end_words: event.target.value }))} />
+              <div className="form-footer"><span>تا ۵۰ واژه</span><button className="primary-button" type="submit" disabled={loading}>{loading ? "در حال ذخیره…" : "انتشار چالش"}</button></div>
+            </form>
           </section>
         )}
 

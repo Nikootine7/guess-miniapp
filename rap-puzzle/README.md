@@ -1,45 +1,62 @@
 # RaPPuzzle Mini App
 
-A Persian, RTL Farcaster Mini App prototype for the daily rap/poetry puzzle described in the project handoff.
+Persian, RTL daily rap/poetry game for Farcaster Mini Apps.
 
-## Current state
+## MVP scope
 
-- The app shell, daily challenge, attempt scoring, voting feed, and weekly leaderboard are implemented as a local preview.
-- The preview stores progress in this browser only. It does not authenticate a FID, persist official scores, or submit real votes.
-- The Farcaster SDK bootstrap is included. A server must verify Quick Auth tokens before any live write.
-- A Supabase schema migration and server API scaffold are included for the next phase. They are not deployed or applied.
-- No wallet payment or NFT mint is triggered by this prototype.
-- The current quality gate checks the final word against a prompt's accepted rhyme list. Persian rhythm and syllable analysis are not implemented yet.
+- Farcaster Quick Auth identifies players by verified FID.
+- Admin FIDs can publish and update daily prompts from an in-app control panel.
+- Prompts use a curated list of accepted Persian rhyme endings.
+- Each player gets up to three attempts, scoring 50 / 30 / 10 for a match and 0 for a wildcard after the third miss.
+- Completing the challenge unlocks the community feed; the database also rejects votes from players who have not completed it.
+- Players spend up to 100 social points per day, in 10-point actions from the app.
+- The weekly leaderboard sums code and community scores. Top-three awards for completed weeks remain visible in the award history.
+- Local preview data is clearly separated from live data; live player state is loaded from Supabase, never local storage.
 
-## Run locally
+Persian text is normalized for Unicode composition, Arabic/Persian Yeh and Kaf variants, diacritics, and trailing punctuation. Rhyme validation remains an exact match against each prompt's curated word list. Automatic syllable and meter analysis, NFTs, payments, merchandise, and artist progression are later phases.
 
-Requires Node.js 22.12 or newer.
+## Database status
 
-1. Enter the rap-puzzle folder. For Vercel, set the project Root Directory to rap-puzzle.
-2. Run npm install.
-3. Run npm run dev.
+The initial RapPuzzle migration and three follow-up migrations have been applied to Supabase and are recorded in migration history. They create namespaced `rap_*` tables and functions, leaving the existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. RLS is enabled; browser roles have no direct table or function access. Server routes use the service-role key and enforce Quick Auth.
 
-The preview banner stays visible unless live mode is explicitly enabled after the backend is configured.
+No live prompt has been seeded yet. Admins can publish one from the app after the production domain, environment values, and admin FID are configured.
 
-## Live configuration
+## Local preview
 
-Configure these server-side environment variables in the hosting provider:
+Requires Node.js 22.12 or newer. Set the Vercel project root to `rap-puzzle`, then run:
 
-- FARCASTER_APP_DOMAIN: the exact host domain, without scheme or path.
-- SUPABASE_URL.
-- SUPABASE_SERVICE_ROLE_KEY: keep this server-only; never expose it through a VITE_ variable.
+```sh
+npm install
+npm run dev
+```
 
-Set VITE_RAPPUZZLE_LIVE=true only after the migration is applied, a daily prompt exists, the API is deployed, and Quick Auth verification works. The browser sends authenticated requests through sdk.quickAuth.fetch; the server verifies each bearer token and gets the FID from the verified token.
+The local preview uses sample prompts, submissions, and scores stored in this browser. It never writes those sample values to Supabase.
 
-Before publishing, use the Farcaster Manifest Tool for the final domain and place its signed accountAssociation values in the manifest. The template in docs/manifest.template.json is deliberately unsigned and is not a production manifest. A hosted manifest is also an option.
+## Server configuration
 
-## Scoring and product phases
+Set these in the hosting provider. Keep the service-role key server-only and never prefix it with `VITE_`.
 
-The local preview uses the agreed 50 / 30 / 10 / 0 scoring sequence. A successful rhyme unlocks voting; three failed attempts add the last entry to the feed as a Wildcard. The weekly leaderboard shows sample data until live endpoints are configured.
+- `FARCASTER_APP_DOMAIN`: exact production hostname, without scheme or path.
+- `SUPABASE_URL`.
+- `SUPABASE_SERVICE_ROLE_KEY`.
+- `RAPPUZZLE_ADMIN_FIDS`: comma-separated FIDs allowed to publish prompts.
+- `VITE_RAPPUZZLE_LIVE=true`: enable live mode in the client build after the API routes and environment variables are configured.
 
-The initial release has no pay-to-submit step. NFT badges, the marketplace, merchandise, artist progression, and music rights belong to later product phases and need their own rules before implementation.
+Open `/api/auth/me` inside the Farcaster Mini App to confirm the signed-in FID. Admin FIDs see a management tab that publishes or updates prompts through `POST /api/admin/prompts`. Example body:
 
-## Database migration
+```json
+{
+  "active_date": "2026-11-25",
+  "opening_line": "A prompt line written by the project owner",
+  "target_rhyme_word": "نور",
+  "accepted_end_words": ["عبور", "حضور", "غرور", "صبور"]
+}
+```
 
-The SQL file in supabase/migrations defines the RapPuzzle data and server-side scoring functions using the `rap_*` namespace. This keeps the restored project’s existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. The migration was applied and recorded in Supabase on 2026-11-24. It creates only `rap_*` tables and functions, leaving the existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. No daily prompt has been seeded yet, and the app is not deployed or live-configured. Review it before deployment. All user writes must go through authenticated server endpoints; browser clients do not receive the service-role key.
+The route accepts today or future UTC dates, normalizes Persian spellings, includes the target word in the accepted list, and replaces an existing prompt for the same date only before the first attempt.
 
+## Farcaster publishing
+
+The production domain and signed account association are not configured yet. Choose the final domain first, generate its association in the Farcaster Mini App Manifest Tool, and place the resulting values in `docs/manifest.template.json`. The domain in the signature must exactly match the manifest host. The template is intentionally unsigned and must not be published as a production manifest.
+
+The Vite app and API routes are prepared for a Vercel deployment with `rap-puzzle` as the project root. Production publication still needs the chosen domain, environment values, a published daily prompt, and deployment.

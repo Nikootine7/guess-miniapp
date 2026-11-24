@@ -32,6 +32,9 @@ export default async function handler(req, res) {
       if (text.includes("self_vote")) {
         return res.status(403).json({ code: "self_vote", message: "به نسخهٔ خودت رأی داده نمی‌شه." });
       }
+      if (text.includes("feed_locked")) {
+        return res.status(403).json({ code: "feed_locked", message: "اول چالش امروزت رو کامل کن." });
+      }
       if (text.includes("invalid_submission")) {
         return res.status(404).json({ code: "invalid_submission", message: "این نسخه برای رأی‌گیری پیدا نشد." });
       }

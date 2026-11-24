@@ -69,6 +69,11 @@ main { flex: 1; }
 textarea { width: 100%; min-height: 120px; resize: vertical; padding: 15px; border: 1px solid rgba(255,255,255,.11); border-radius: 13px; color: var(--ink); background: rgba(10,8,17,.55); line-height: 1.8; transition: border .2s ease, box-shadow .2s ease; }
 textarea::placeholder { color: #696376; }
 textarea:focus { border-color: rgba(166,139,255,.65); box-shadow: 0 0 0 4px rgba(166,139,255,.08); outline: 0; }
+.admin-form { display: grid; gap: 10px; }
+.admin-form label { margin-top: 4px; color: #dad2e7; font-size: 12px; font-weight: 800; }
+.admin-form input { width: 100%; min-height: 44px; padding: 10px 13px; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; color: var(--ink); background: rgba(10,8,17,.55); }
+.admin-form input:focus { border-color: rgba(166,139,255,.65); box-shadow: 0 0 0 4px rgba(166,139,255,.08); outline: 0; }
+.admin-form textarea { min-height: 78px; }
 .form-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: #777186; font-size: 10px; }
 .primary-button { display: inline-flex; align-items: center; gap: 12px; padding: 11px 17px; border: 0; border-radius: 11px; color: #1b1022; background: linear-gradient(120deg, var(--pink), #ff9b9b); box-shadow: 0 8px 22px rgba(248,106,183,.19); cursor: pointer; font-size: 12px; font-weight: 900; transition: transform .16s ease; }
 .primary-button:hover:not(:disabled) { transform: translateY(-2px); }

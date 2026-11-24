@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (promptError) throw promptError;
     if (!prompt) {
-      return res.status(200).json({ attempts_used: 0, is_complete: false, code_score: 0, points_used: 0, submission: null });
+      return res.status(200).json({ prompt_available: false, attempts_used: 0, is_complete: false, code_score: 0, points_used: 0, submission: null });
     }
 
     const [stateResult, submissionResult, budgetResult] = await Promise.all([
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     if (budgetResult.error) throw budgetResult.error;
 
     return res.status(200).json({
+      prompt_available: true,
       attempts_used: Number(stateResult.data?.attempts_used || 0),
       is_complete: Boolean(stateResult.data?.is_complete),
       code_score: Number(stateResult.data?.code_score || 0),

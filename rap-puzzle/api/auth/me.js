@@ -1,4 +1,4 @@
-import { requireFid } from "../../server/auth.js";
+import { isAdminFid, requireFid } from "../../server/auth.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -8,5 +8,5 @@ export default async function handler(req, res) {
 
   const fid = await requireFid(req, res);
   if (!fid) return;
-  return res.status(200).json({ fid });
+  return res.status(200).json({ fid, is_admin: isAdminFid(fid) });
 }

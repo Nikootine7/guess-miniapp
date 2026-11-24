@@ -1,10 +1,6 @@
 import { requireFid } from "../server/auth.js";
 import { getSupabaseAdmin } from "../server/supabase.js";
-
-function lastWordOf(verse) {
-  const words = verse.normalize("NFKC").trim().split(/\s+/u);
-  return (words.at(-1) || "").replace(/[\p{P}\p{S}]+$/u, "").toLocaleLowerCase("fa");
-}
+import { lastWordOf } from "../shared/normalize-persian.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

@@ -31,3 +31,32 @@ export async function requireFid(req, res) {
     return null;
   }
 }
+
+function getConfiguredAdminFids() {
+  return (process.env.RAPPUZZLE_ADMIN_FIDS || "")
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isSafeInteger(value) && value > 0);
+}
+
+export function isAdminFid(fid) {
+  return getConfiguredAdminFids().includes(fid);
+}
+
+export async function requireAdminFid(req, res) {
+  const fid = await requireFid(req, res);
+  if (!fid) return null;
+
+  const configuredFids = getConfiguredAdminFids();
+  if (configuredFids.length === 0) {
+    res.status(503).json({ code: "admin_not_configured", message: "مدیریت چالش‌ها هنوز تنظیم نشده." });
+    return null;
+  }
+
+  if (!configuredFids.includes(fid)) {
+    res.status(403).json({ code: "admin_required", message: "دسترسی مدیریت این بخش را نداری." });
+    return null;
+  }
+
+  return fid;
+}
