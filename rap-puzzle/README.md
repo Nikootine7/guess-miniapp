@@ -17,7 +17,7 @@ Persian text is normalized for Unicode composition, Arabic/Persian Yeh and Kaf v
 
 ## Database status
 
-The initial RapPuzzle migration and three follow-up migrations have been applied to Supabase and are recorded in migration history. They create namespaced `rap_*` tables and functions, leaving the existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. RLS is enabled; browser roles have no direct table or function access. Server routes use the service-role key and enforce Quick Auth.
+The initial RapPuzzle migration and four follow-up migrations have been applied to Supabase and are recorded in migration history. They create namespaced `rap_*` tables and functions, leaving the existing `daily_prompts`, `submissions`, `ratings`, and `user_stats` tables untouched. RLS is enabled; browser roles have no direct table or function access. Server routes use the service-role key and enforce Quick Auth.
 
 No live prompt has been seeded yet. Admins can publish one from the app after the production domain, environment values, and admin FID are configured.
 

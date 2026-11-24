@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   const submissionId = typeof req.body?.submission_id === "string" ? req.body.submission_id : "";
   const points = Number(req.body?.points);
-  if (!submissionId || !Number.isInteger(points) || points < 1 || points > 100) {
+  if (!submissionId || points !== 10) {
     return res.status(400).json({ code: "invalid_vote", message: "رأی معتبر نیست." });
   }
 
@@ -26,6 +26,9 @@ export default async function handler(req, res) {
 
     if (error) {
       const text = String(error.message || "");
+      if (text.includes("invalid_vote")) {
+        return res.status(400).json({ code: "invalid_vote", message: "هر رأی باید دقیقاً ۱۰ امتیاز باشد." });
+      }
       if (text.includes("vote_budget_exceeded")) {
         return res.status(409).json({ code: "vote_budget_exceeded", message: "امتیاز اجتماعی آزاد کافی نیست." });
       }
