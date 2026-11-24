@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "GENERATE_FOR_YOUR_DOMAIN",
+    "payload": "GENERATE_FOR_YOUR_DOMAIN",
+    "signature": "GENERATE_FOR_YOUR_DOMAIN"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "RaPPuzzle",
+    "homeUrl": "https://YOUR_DOMAIN",
+    "iconUrl": "https://YOUR_DOMAIN/icon.png",
+    "splashImageUrl": "https://YOUR_DOMAIN/splash.png",
+    "splashBackgroundColor": "#100d1b",
+    "subtitle": "چالش روزانهٔ رپ",
+    "description": "یک خط شروع، سه تلاش و یک فید اجتماعی برای قافیه‌ها."
+  }
+}
