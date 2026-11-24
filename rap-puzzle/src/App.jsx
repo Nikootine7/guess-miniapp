@@ -529,7 +529,6 @@ export default function App() {
                   <span>{verse.length} / ۲۸۰</span>
                   <button className="primary-button" type="submit" disabled={loading || !canSubmit || game.attempts >= 3}>
                     {loading || !canSubmit ? "در حال بررسی…" : game.attempts === 0 ? "قافیه رو چک کن" : "تلاش دوباره"}
-                    <span aria-hidden="true">↗</span>
                   </button>
                 </div>
               </form>
@@ -540,7 +539,7 @@ export default function App() {
                   <strong>{game.scoreCode > 0 ? "چالش کامل شد" : "Wildcard ثبت شد"}</strong>
                   <p>{game.submission?.submission_text || "نسخهٔ امروزت ثبت شد."}</p>
                 </div>
-                <button className="text-button" onClick={openFeed}>رفتن به فید <span>←</span></button>
+                <button className="text-button" onClick={openFeed}>رفتن به فید</button>
               </div>
             )}
 
