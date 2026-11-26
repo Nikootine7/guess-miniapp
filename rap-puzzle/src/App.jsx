@@ -22,7 +22,13 @@ const DEMO_LEADERBOARD = [
 ];
 
 const LIVE_REQUESTED = import.meta.env.VITE_RAPPUZZLE_LIVE === "true";
+const API_BASE = (import.meta.env.VITE_RAPPUZZLE_API_BASE || "").replace(/\/+$/u, "");
 const initialDayKey = new Date().toISOString().slice(0, 10);
+
+function apiUrl(path) {
+  const cleanPath = String(path || "").replace(/^\/+/, "");
+  return API_BASE ? API_BASE + "/" + cleanPath : "/api/" + cleanPath;
+}
 
 function storageKeyForDate(dateKey) {
   return "rappuzzle-demo-" + dateKey;
@@ -174,9 +180,9 @@ export default function App() {
       setWeeklyAwards([]);
       try {
         const [promptResponse, statusResponse, identityResponse] = await Promise.all([
-          sdk.quickAuth.fetch("/api/prompt"),
-          sdk.quickAuth.fetch("/api/status"),
-          sdk.quickAuth.fetch("/api/auth/me"),
+          sdk.quickAuth.fetch(apiUrl("prompt")),
+          sdk.quickAuth.fetch(apiUrl("status")),
+          sdk.quickAuth.fetch(apiUrl("auth/me")),
         ]);
         const [promptData, statusData, identityData] = await Promise.all([
           promptResponse.json().catch(() => ({})),
@@ -241,7 +247,7 @@ export default function App() {
       setFeed(DEMO_SUBMISSIONS);
       return;
     }
-    const response = await sdk.quickAuth.fetch("/api/feed");
+    const response = await sdk.quickAuth.fetch(apiUrl("feed"));
     if (!response.ok) throw new Error("فید رأی‌گیری بارگذاری نشد.");
     const data = await response.json();
     setFeed(data.submissions || []);
@@ -253,7 +259,7 @@ export default function App() {
       setWeeklyAwards([]);
       return;
     }
-    const response = await fetch("/api/leaderboard");
+    const response = await fetch(apiUrl("leaderboard"));
     if (!response.ok) throw new Error("جدول هفتگی بارگذاری نشد.");
     const data = await response.json();
     setLeaderboard(data.leaderboard || []);
@@ -274,7 +280,7 @@ export default function App() {
     setLoading(true);
     try {
       if (liveMode) {
-        const response = await sdk.quickAuth.fetch("/api/submit", {
+        const response = await sdk.quickAuth.fetch(apiUrl("submit"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ verse: cleanVerse }),
@@ -358,7 +364,7 @@ export default function App() {
     setLoading(true);
     try {
       if (liveMode && submissionId !== "own") {
-        const response = await sdk.quickAuth.fetch("/api/vote", {
+        const response = await sdk.quickAuth.fetch(apiUrl("vote"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ submission_id: submissionId, points: allocation }),
@@ -406,7 +412,7 @@ export default function App() {
     setLoading(true);
     setNotice("");
     try {
-      const response = await sdk.quickAuth.fetch("/api/admin/prompts", {
+      const response = await sdk.quickAuth.fetch(apiUrl("admin/prompts"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

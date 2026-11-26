@@ -1,17 +1,25 @@
 {
   "accountAssociation": {
-    "header": "GENERATE_FOR_YOUR_DOMAIN",
-    "payload": "GENERATE_FOR_YOUR_DOMAIN",
-    "signature": "GENERATE_FOR_YOUR_DOMAIN"
+    "header": "PASTE_ACCOUNT_ASSOCIATION_HEADER",
+    "payload": "PASTE_ACCOUNT_ASSOCIATION_PAYLOAD",
+    "signature": "PASTE_ACCOUNT_ASSOCIATION_SIGNATURE"
   },
   "miniapp": {
     "version": "1",
     "name": "RaPPuzzle",
-    "homeUrl": "https://YOUR_DOMAIN",
-    "iconUrl": "https://YOUR_DOMAIN/icon.png",
-    "splashImageUrl": "https://YOUR_DOMAIN/splash.png",
+    "homeUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site",
+    "iconUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site/icon.png",
+    "imageUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site/hero.png",
+    "buttonTitle": "شروع بازی",
+    "splashImageUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site/splash.png",
     "splashBackgroundColor": "#100d1b",
     "subtitle": "چالش روزانهٔ رپ",
-    "description": "یک خط شروع، سه تلاش و یک فید اجتماعی برای قافیه‌ها."
+    "description": "هر روز یک خط شروع؛ سه تلاش برای قافیه و بعد رأی جامعه.",
+    "primaryCategory": "games",
+    "tags": ["rap", "persian", "poetry", "writing", "daily"],
+    "heroImageUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site/hero.png",
+    "ogTitle": "RaPPuzzle",
+    "ogDescription": "یک خط شروع؛ سه تلاش برای قافیه؛ بعدش رأی جامعه.",
+    "ogImageUrl": "https://rappuzzle.faithfulfolio64.chatgpt.site/hero.png"
   }
 }
